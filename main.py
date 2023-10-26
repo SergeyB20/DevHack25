@@ -173,6 +173,21 @@ async def SetMailing(message: types.Message):
 
         # ДОБАВИТЬ ПАРСЕР ПЛАНШЕТКИ (ДЛЯ ГРУППЫ/ДЛЯ ПРЕПОДА)
         await message.answer('расписание на сегодня с планшетки')
+        check_day()
+        plansрetka()
+        load_pl()
+        os.remove(f'result/{user_id}.txt')
+        try: 
+            group_parse(NumGroup, user_id)
+            with open(f'result/{user_id}.txt', 'r', encoding='utf-8') as doc:
+             await message.answer(doc.read())
+             
+        except:
+            teacher_parse(NumGroup, user_id)
+            with open(f'result/{user_id}.txt', 'r', encoding='utf-8') as doc:
+             await message.answer(doc.read())
+             
+
 
     if msg.lower() == 'звонки':
         await message.answer(bells, parse_mode=ParseMode.HTML)
