@@ -15,10 +15,17 @@ sql.execute("""CREATE TABLE IF NOT EXISTS users (
 )""")
 
 sql.execute("""CREATE TABLE IF NOT EXISTS tasks (
-    DATE TEXT,
-    NUMGROUP TEXT,
-    SUBJECT TEXT,
-    CONTENTS BLOB
+    DATE TEXT NOT NULL,
+    NUMGROUP TEXT NOT NULL,
+    CONTENTS TEXT NOT NULL
+)""")
+
+sql.execute("""CREATE TABLE IF NOT EXISTS contacts (
+    FULLNAME TEXT,
+    FIO TEXT,
+    PHONENUMBER TEXT,
+    TELEGRAM TEXT,
+    MAIL TEXT
 )""")
 
 db.commit()

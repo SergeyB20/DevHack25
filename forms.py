@@ -9,3 +9,6 @@ class Form(StatesGroup):
   Meny = State()
   AddNote = State()
   notification = State()
+  addcontacts = State()
+  support_ask = State()
+  support = State()
