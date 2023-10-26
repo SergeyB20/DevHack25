@@ -3,12 +3,12 @@ from aiogram.dispatcher import FSMContext
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.types import ReplyKeyboardMarkup, ParseMode
 from datetime import datetime
-import time, random, sqlite3, os
+import time, random, sqlite3, os, datetime
 from forms import Form
 from config import *
 
-
-TOKEN =TOKEN_BOT 
+PASSWORD = PASSWORD_TEACH
+TOKEN = TOKEN_BOT
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -22,7 +22,7 @@ sql = db.cursor()
 async def StartFunction(message: types.Message):
     user_id = message.from_user.id
 
-    if user_id == 809727326:
+    if user_id == 80972326:
         await message.answer(f'<b>Вы авторизованы как служба поддержки!\n</b> <i> Что-бы отвечать пользователю на заднные вопросы, вводите ответ по данному шаблону\n\n[номер пользователя]\n[текст сообщения]</i>', parse_mode=ParseMode.HTML)
         await Form.support.set()
     
@@ -53,7 +53,7 @@ async def SetCategory(message: types.Message):
     if msg.lower() == 'преподаватель':
         sql.execute(f"UPDATE users SET CATEGORY='{msg.lower()}' WHERE ID={user_id}")
         db.commit()
-        await message.answer('✏️Введите ваше ФИО [Иванов И.И]')
+        await message.answer('✏️Введите ваше ФИО [Иванов И.И.]')
         await Form.NumGroup.set()
 
 # СОХРАНЕНИЕ НОМЕРА ГРУППЫ/ФИО ПОЛЬЗОВАТЕЛЯ В БД
@@ -61,7 +61,11 @@ async def SetCategory(message: types.Message):
 async def SetNumGroup(message: types.Message):
     user_id = message.from_user.id
     msg = message.text
-    sql.execute(f"UPDATE users SET NUMGROUP='{msg.lower()}' WHERE ID={user_id}")
+    for category in sql.execute(f"SELECT CATEGORY FROM users WHERE ID={user_id}"):
+        if category[0].lower()  == 'преподаватель':
+            sql.execute(f"UPDATE users SET NUMGROUP='{msg}' WHERE ID={user_id}")
+        if category[0].lower()  == 'студент':
+            sql.execute(f"UPDATE users SET NUMGROUP='{msg.lower()}' WHERE ID={user_id}")
     db.commit()
 
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -110,11 +114,19 @@ async def SetMailing(message: types.Message):
             btn = types.KeyboardButton(text=f'Пары {str(NumGroup[0]).upper()}')
             btn1 = types.KeyboardButton(text=f'Пары на неделю {str(NumGroup[0]).upper()}')
             btn2 = types.KeyboardButton(text=f'Помощь/FAQ')
-            btn3 = types.KeyboardButton(text=f'Планшетка {str(NumGroup[0]).upper()}')
+            btn3 = types.KeyboardButton(text=f'Планшетка {NumGroup[0].upper()}')
             keyboard.add(btn, btn1, btn2, btn3)
 
-        await message.answer('На этом всё, регистрация окончена!', reply_markup=keyboard)
-        await Form.Meny.set()
+        for category in sql.execute(f"SELECT CATEGORY FROM users WHERE ID={user_id}"):
+            category = category[0]
+
+        if category.lower() == 'преподаватель':
+            await message.answer('Введите код доступа')
+            await Form.TeachPass.set()
+        else:
+            await message.answer_sticker(sticker='https://github.com/TelegramBots/book/raw/master/src/docs/sticker-fred.webp')
+            await message.answer('На этом всё, регистрация окончена!', reply_markup=keyboard)
+            await Form.Meny.set()
 
 
 # ЕСЛИ ПОЛЬЗОВАТЕЛЬ ПРЕПОД, ОН ВВОДИТ КЛЮЧ ДОСТУПА И ПОЛУЧАЕТ ВСЕ ФУНКЦИИ
@@ -127,10 +139,10 @@ async def SetTeachPass(message: types.Message):
         for FullName in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
             FullName = FullName[0]
         keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        btn = types.KeyboardButton(text=f'Пары {FullName.upper()}')
-        btn1 = types.KeyboardButton(text=f'Пары на неделю {FullName.upper()}')
+        btn = types.KeyboardButton(text=f'Пары {FullName}')
+        btn1 = types.KeyboardButton(text=f'Пары на неделю {FullName}')
         btn2 = types.KeyboardButton(text=f'Помощь/FAQ')
-        btn3 = types.KeyboardButton(text=f'Планшетка {str(FullName).upper()}')
+        btn3 = types.KeyboardButton(text=f'Планшетка {FullName}')
         keyboard.add(btn, btn1, btn2, btn3)
         await message.answer('Отлично, авторизация прошла успешно!\nВам доступны все функции', reply_markup=keyboard)
         await Form.Meny.set()
@@ -153,7 +165,15 @@ async def SetMailing(message: types.Message):
         for NumGroup in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
             NumGroup = NumGroup[0] #номер группы или ФИО
         # ФУНКЦИЯ ВЫВОДА РАСПИСАНИЯ НА ДВА ДНЯ (ГРУППЫ/ПРЕПОДА)
-        await message.answer('пары на 2 дня')
+        try:
+            StudentParserTwoDays(user_id=user_id, NumGroup=msg.split(' ')[-1].upper())
+            with open(f'result/{user_id}.txt', encoding='utf-8') as doc:
+                    await message.answer(doc.read())
+        except:
+            print(f'{msg.split(" ")[-2]} {msg.split(" ")[-1]}')
+            ParserTeacherTwoDays(user_id=user_id, fullname=f'{msg.split(" ")[-2]} {msg.split(" ")[-1]}')
+            with open(f'result/{user_id}.txt', encoding='utf-8') as doc:
+                    await message.answer(doc.read())
 
     if (len(msg.lower().split(' ')) == 4) and (msg.lower().split(' ')[1] == 'на') or (len(msg.lower().split(' ')) == 5) and (msg.lower().split(' ')[0] == 'пары'):
         for NumGroup in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
@@ -172,28 +192,29 @@ async def SetMailing(message: types.Message):
             NumGroup = NumGroup[0]#номер группы или ФИО
 
         # ДОБАВИТЬ ПАРСЕР ПЛАНШЕТКИ (ДЛЯ ГРУППЫ/ДЛЯ ПРЕПОДА)
-        await message.answer('расписание на сегодня с планшетки')
         check_day()
         plansрetka()
         load_pl()
         os.remove(f'result/{user_id}.txt')
         try: 
-            group_parse(NumGroup, user_id)
+            group_parse(group=f'{msg.split(" ")[-1]}', user_id=user_id)
             with open(f'result/{user_id}.txt', 'r', encoding='utf-8') as doc:
              await message.answer(doc.read())
              
         except:
-            teacher_parse(NumGroup, user_id)
+            teacher_parse(teacher=f'{msg.split(" ")[-2]} {msg.split(" ")[-1]}', user_id=user_id)
             with open(f'result/{user_id}.txt', 'r', encoding='utf-8') as doc:
              await message.answer(doc.read())
-             
-
 
     if msg.lower() == 'звонки':
         await message.answer(bells, parse_mode=ParseMode.HTML)
 
     if msg.lower() == 'регистрация':
-        await message.answer('Кем ты являешься? \n[студент/преподаватель]')
+        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        btn = types.KeyboardButton(text=f'студент', resize_keyboard=True)
+        btn1 = types.KeyboardButton(text=f'преподаватель', resize_keyboard=True)
+        keyboard.add(btn, btn1)
+        await message.answer('Кем ты являешься? \n[студент/преподаватель]', reply_markup=markup)
         await Form.category.set()
     
     if msg.lower().split(' ')[0] == 'уведомления':
@@ -213,7 +234,7 @@ async def SetMailing(message: types.Message):
         await message.answer(ManTeach)
 
     if msg.lower() == 'контактная информация':
-        await message.answer('Текст контактной информации')
+        await message.answer(contact_info, parse_mode=ParseMode.HTML)
 
     if msg.lower() == 'режим работы':
         await message.answer(OperatingMode, parse_mode=ParseMode.HTML)
@@ -248,11 +269,11 @@ async def SetMailing(message: types.Message):
             await message.answer('У вас нет доступа к этой функции')
 
     if (len(msg.lower().split(' ')) == 2) and (msg.lower().split(' ')[0] == 'заметка'):
-        for NumGroup in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
-            for content in sql.execute(f"SELECT CONTENTS FROM tasks WHERE DATE='{msg.lower().split(' ')[1]}' AND NUMGROUP='{NumGroup[0].lower()}' "):
-                msg = str(content[0]).replace('/n', '\n')
-                print(msg)
-                await message.answer(msg)
+            for NumGroup in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
+                for content in sql.execute(f"SELECT CONTENTS FROM tasks WHERE DATE='{msg.lower().split(' ')[1]}' AND NUMGROUP='{NumGroup[0]}' "):
+                    msg = str(content[0]).replace('/n', '\n')
+                    print(msg)
+                    await message.answer(msg)
 
     if (len(msg.lower().split(' ')) == 3) and (msg.lower().split(' ')[0] == 'контакт'):
         msg = msg.lower().split(" ")
@@ -267,7 +288,7 @@ async def SetMailing(message: types.Message):
             category = category[0]
 
         if category.lower() == 'преподаватель':
-            await message.answer('<b>Заполните по данному примеру:</b>\n\n<i>[ФИО]\n[Номер телефона]\n[Телеграм]\n[Почта]\n  </i>', parse_mode=ParseMode.HTML)
+            await message.answer('<b>Заполните по данному примеру:</b>\n\n<i>[Фамилия И.О.]\n[ФИО]\n[Номер телефона]\n[Телеграм]\n[Почта]\n  </i>', parse_mode=ParseMode.HTML)
             sql.execute(f"INSERT INTO contacts (FULLNAME) VALUES ('{msg.lower().split(' ')[-1]}')")
             await Form.addcontacts.set()
         else:
@@ -291,11 +312,14 @@ async def AddNote(message: types.Message):
     msg = message.text
 
     content = msg.split('\n')
+    print(content)
     try:
-        for contents in sql.execute(f"SELECT CONTENTS FROM tasks WHERE DATE='{content[0]}' AND NUMGROUP='{content[1].lower()}' "):
-            sql.execute(f"UPDATE tasks SET CONTENTS='{f'{contents[0]} /n {content[-2]}{content[-1]}'}' WHERE DATE='{content[0]}'AND NUMGROUP='{content[1].lower()}' ")
+        for contents in sql.execute(f"SELECT CONTENTS FROM tasks WHERE DATE={content[0]} AND NUMGROUP={content[1].lower()} "):
+            sql.execute(f"UPDATE tasks SET CONTENTS='{f'{contents[0]} /n {content[-2]}{content[-1]}'}' WHERE DATE={content[0]} AND NUMGROUP={content[1].lower()} ")
+            db.commit()
     except:
         sql.execute(f"INSERT INTO tasks (DATE, NUMGROUP, CONTENTS) VALUES ('{content[0]}', '{content[1].lower()}', '{content[-2]}{content[-1]}')")
+        db.commit()
     finally:
         db.commit()
         await message.answer('<i>Заметка добавлена, вы были переведены в меню...</i>', parse_mode=ParseMode.HTML)

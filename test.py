@@ -1,4 +1,4 @@
-import requests
+import requests, datetime
 from bs4 import BeautifulSoup
 
 cookies = {
@@ -32,9 +32,22 @@ headers = {
 }
 
 data = {
-    'teacher': 'Алексеенко О.Н.',
+    'teacher': 'Наливайко Е.П.',
     'stp': 'Показать!',
 }
+
+
+weekdays = {
+    0 : 'понедельник',
+    1 : 'вторник',
+    2 : 'среда',
+    3 : 'четверг',
+    4 : 'пятница',
+    5 : 'суббота',
+    6 : 'воскресенье'
+}
+
+
 
 response = requests.post('https://www.rksi.ru/schedule', cookies=cookies, headers=headers, data=data)
 with open(f'result.txt', 'wb') as doc:
@@ -45,6 +58,10 @@ with open(f'result.txt', encoding='utf-8') as doc:
 
 a = src.split('</table>')[-1].split('</main>')[0].replace('<h3>', '\n').replace('<p>', '\n').replace('<b>', '\n')
 b = a.replace('</h3>', '\n').replace('</p>', '\n').replace('</b>', '\n').replace('<br />', ' ').replace('<hr>', ' ').replace('<div style="clear: both;"></div>', ' ')
-print(b)
+
 with open(f'result.txt', 'w', encoding='utf-8') as doc:
-    doc.write(b.replace('УП', ''))
+    weekday_number = datetime.date.today().weekday()
+    b = b.replace('УП', '').split(weekdays[weekday_number+2])[0].split('\n')
+    b.pop(-1)
+    print(b)
+    doc.write()
