@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 
 
 TOKEN_BOT = '6626305859:AAHBWHuV_-lhP6EhU8AR5Qrvzs8nthV9ciY'
-
+PASSWORD = '123'
 
 
 with open('TEXT/manual_student.txt', 'r', encoding='utf-8') as doc:

@@ -123,7 +123,7 @@ async def SetTeachPass(message: types.Message):
     user_id = message.from_user.id
     msg = message.text
 
-    if msg == '123':
+    if msg == PASSWORD:
         for FullName in sql.execute(f"SELECT NUMGROUP FROM users WHERE ID={user_id}"):
             FullName = FullName[0]
         keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
